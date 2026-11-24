@@ -1,0 +1,16 @@
+@'
+# Sauvegardes temporaires
+*.bak
+*.tmp
+*~
+
+# Fichiers de test locaux (optionnel : retire ces lignes si tu veux les versionner)
+test_rechercher.s
+test_inserer.s
+
+# Fichiers système / éditeur
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+'@ | Set-Content -Path .gitignore -Encoding utf8
