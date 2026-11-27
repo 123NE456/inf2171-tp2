@@ -1,147 +1,134 @@
-# TP2 --- Dictionnaire de mots
+# TP2 — Dictionnaire de mots
 
-Projet réalisé dans le cadre du cours **INF2171** --- Automne 2026.
+Projet réalisé dans le cadre du cours **INF2171** — Automne 2026.
 
-Le programme est écrit en **assembleur RISC-V 64 bits**. Il vise à lire
-un fichier texte, en extraire les mots et construire un dictionnaire de
-mots distincts avec leur position, leur longueur et leur fréquence.
+Le programme est écrit en **assembleur RISC-V 64 bits**. Il permet de lire un fichier texte, d'en extraire les mots et de construire un dictionnaire trié de mots distincts contenant leur position, leur longueur et leur fréquence d'apparition.
 
-## Objectif
+## 1. Objectif du projet
 
 À partir d'un fichier texte fourni en argument, le programme doit :
 
-1.  Lire le contenu du fichier dans un tampon.
-2.  Parcourir le texte et séparer les mots.
-3.  Exclure les chiffres et reconnaître les délimiteurs.
-4.  Construire un dictionnaire trié de mots distincts.
-5.  Enregistrer pour chaque entrée sa position, sa longueur et sa
-    fréquence.
-6.  Rechercher les mots dans le dictionnaire et afficher le résultat.
+1. Lire le contenu du fichier dans un tampon mémoire.
+2. Parcourir le texte et séparer les mots.
+3. Reconnaître les délimiteurs et exclure les chiffres.
+4. Construire un dictionnaire trié de mots distincts.
+5. Enregistrer pour chaque entrée sa position, sa longueur et sa fréquence.
+6. Rechercher les mots dans le dictionnaire et afficher les résultats.
 
-Ce TP permet de pratiquer la programmation en assembleur, la gestion
-mémoire, les appels système, les conventions d'appel et les algorithmes
-de recherche et d'insertion.
+Ce travail pratique permet de mettre en application les notions de programmation en assembleur, de gestion de la mémoire, d'appels système, de conventions d'appel et d'algorithmes de recherche et d'insertion.
 
-## Environnement
+## 2. Environnement et limites
 
--   **Langage :** RISC-V 64 bits
--   **Assembleur / simulateur :** RARS
--   **Fichier principal :** `mots.s`
--   **Capacité prévue du tampon :** 2048 octets
--   **Nombre maximal prévu d'entrées distinctes :** 200
+- **Langage :** RISC-V 64 bits
+- **Assembleur / simulateur :** RARS
+- **Fichier principal :** `mots.s`
+- **Capacité maximale du tampon :** 2048 octets
+- **Nombre maximal d'entrées distinctes :** 200
+- **Taille d'une entrée du dictionnaire :** 24 octets
 
-### Structure prévue d'une entrée du dictionnaire
+### 2.1 Structure d'une entrée du dictionnaire
 
-Chaque entrée occupe **24 octets** :
+Chaque entrée du dictionnaire contient trois champs de 8 octets, soit un total de 24 octets.
 
-  Champ                           Taille
-  --------------------------- ----------
-  Position dans le texte        8 octets
-  Longueur du mot en octets     8 octets
-  Fréquence                     8 octets
+| Champ | Taille |
+|---|---|
+| Position dans le texte | 8 octets |
+| Longueur du mot en octets | 8 octets |
+| Fréquence d'apparition | 8 octets |
+| **Total par entrée** | **24 octets** |
 
-L'espace réservé à 200 entrées est donc de 4800 octets.
+L'espace mémoire réservé au dictionnaire est de 4800 octets, ce qui permet de stocker au maximum 200 entrées.
 
-## Algorithme général
+La position et la longueur sont exprimées en octets, et non en nombre de caractères visibles. Cette distinction est importante pour les caractères accentués encodés en UTF-8.
 
-### Gestion des délimiteurs (routine `Delimiteur`)
+## 3. Algorithme général
 
-Cette routine fait la détection d'un octet reçu pour savoir s'il s'agit d'un délimiteur.
-La macro `TEST_DELIM` permet de tester les caractères sans refaire les mêmes instructions.
+### 3.1 Détection des délimiteurs — `Delimiteur`
 
-### Séparation  des mots (routine `Separer`)
+La routine `Delimiteur` reçoit un octet et détermine s'il correspond à un délimiteur. La macro `TEST_DELIM` permet de tester différents caractères de séparation en réutilisant les mêmes instructions afin de délimiter les mots dans le texte.
 
-La routine parcourt octet par octet jusqu'a trouver le début d'un mot, mémorise sa position et avance au prochaine delimiteur. On calcule la longueur du mot en soustrayant la position du début à la position du caractère avant le délimiteur. On appelle la routine `Inserer` pour l'insertion du mot et on continue le parcours du texte jusqu'a la fin.
+### 3.2 Séparation des mots — `Separer`
 
-### Gestion des caractères UTF8
+La routine parcourt le texte octet par octet. Lorsqu'elle rencontre le début d'un mot, elle mémorise sa position et poursuit jusqu'au prochain délimiteur. La longueur du mot est calculée à partir des positions de début et de fin, puis la routine appelle `Insérer` pour rechercher le mot dans le dictionnaire ou l'ajouter. Les chiffres sont exclus conformément aux règles du travail pratique.
 
-Tous les caractères ASCII font un octet, mais les caracteres avec accent ont deux octect et le premier octet est `0xC3`
-La routine `Map` utilise la macro `MAP_DIACRITIQUE` pour l'association du deuxième caractere à la lettre correspondant en ASCII minuscule et majuscule.
+### 3.3 Gestion des caractères UTF-8 — `Map`
 
-### Comparer les mots (routine `Comparer`)
+Les caractères ASCII occupent un octet, tandis que les caractères accentués courants en UTF-8 sont encodés sur deux octets, avec `0xC3` comme premier octet. La routine `Map` utilise la macro `MAP_DIACRITIQUE` pour associer le deuxième octet à sa lettre correspondante en ASCII (minuscule ou majuscule) lors des comparaisons.
 
-La routine `comparer` recoit les adresses des deux mots a comparer et la longueur de comparaison. On retourne une valeur négatif si le premier mot et avant le second, zero si les valeur sont pareil et positif si le premier mot et apres le second
+### 3.4 Comparaison des mots — `Comparer`
 
-1.  Si les octets sont identiques, l'index avance.
-2.  Si le premier octet différent du premier mot est égal à `0xC3`, son deuxième octet est converti avec `Map`. La routine retourne la différence avec l'octet du deuxième mot, ou `1` si les valeurs correspondent.
-3.  Si c'est l'octet du deuxième mot est égal à `0xC3`, la routine retourne la différence avec l'octet du premier mot. La routine retourne la différence, ou `-1` si les valeurs correspondent.
-4.  Sinon, la routine retourne la différence entre les deux octets.
-5.  Si toute la longueur est parcourue sans différence, elle retourne zéro.
+La routine `Comparer` reçoit les adresses des deux mots à comparer ainsi que la longueur de comparaison, et retourne une valeur négative, nulle ou positive selon l'ordre relatif des deux mots :
 
-### Fouille binaire (routine `Rechercher`)
+1. Si les octets sont identiques, l'index avance.
+2. Si l'octet courant du premier mot vaut `0xC3`, son deuxième octet est converti avec `Map` puis comparé à l'octet du deuxième mot.
+3. Si l'octet courant du deuxième mot vaut `0xC3`, la conversion est appliquée de la même façon pour ce mot.
+4. Sinon, le résultat est déterminé par la différence entre les deux octets comparés.
+5. Si toute la longueur est parcourue sans différence, la routine retourne zéro.
 
-La recherche permet de trouver un mot sans avoir a faire tous les entrées du dictionnaires
-On recoit l'adresse du tampon, la position et la longueur du mot, l'adresse du dictionnaire et la valeur du décompte.
+La comparaison est utilisée par la recherche binaire pour maintenir l'ordre du dictionnaire.
 
-1.  Initialiser `i = 0` et `j = compte - 1`.
-2.  Tant que `i <= j`, calculer le milieu `m = (i + j) / 2`.
-3.  Calculer l'adresse de l'entrée : `dictionnaire + m * 24`.
-4.  Lire la position et la longueur du mot de cette entrée, puis calculer son adresse dans le tampon.
-5.  Appeler la routine `Comparer` avec la plus petite des deux longueurs.
-6.  Si le résultat est négatif, on poursuit à gauche (`j = m - 1`). S'il est positif, poursuivre à droite (`i = m + 1`).
-7.  Si le résultat est nul, on compare les longueurs  si elles sont égales alors le mot est trouvé.
-8.  Si l'intervalle devient vide, on retourne `i` comme position d'insertion.
+### 3.5 Recherche binaire — `Rechercher`
 
- ### Insertion (routine `Insérer`)
+La routine `Rechercher` localise un mot dans le dictionnaire à partir de l'adresse du tampon, de la position et de la longueur du mot, de l'adresse du dictionnaire et du nombre d'entrées :
 
-La routine reçoit les informations du mot, l'adresse du tampon, l'adresse du dictionnaire et l'adresse du décompte.
+1. Initialiser les bornes `i = 0` et `j = compte - 1`.
+2. Tant que `i <= j`, calculer le milieu `m = (i + j) / 2`.
+3. Calculer l'adresse de l'entrée à l'offset `m * 24` dans le dictionnaire.
+4. Lire la position et la longueur de cette entrée, puis calculer son adresse dans le tampon.
+5. Appeler `Comparer` avec la plus petite des deux longueurs.
+6. Si le résultat est négatif, chercher à gauche (`j = m - 1`) ; s'il est positif, chercher à droite (`i = m + 1`).
+7. Si le résultat est nul, comparer les longueurs : s'il y a égalité, le mot est trouvé.
+8. Si l'intervalle devient vide, retourner `i` comme position d'insertion.
 
-1. Appeler la routine `Rechercher` pour obtenir l'index du mot ou sa position d'insertion.
-2. Si le mot existe déjà, augmenter sa fréquence sans modifier le décompte.
-3. Si le mot n'existe pas, vérifier que le dictionnaire n'est pas plein.
-4. Calculer l'adresse d'insertion en multipliant l'index par 24 et en ajoutant l'adresse du dictionnaire.
-5. Décaler les triplets vers la droite en partant de la dernière entrée jusqu'à la position d'insertion pour éviter d'écraser les données.
-6. Enregistrer la position et la longueur du nouveau mot et initialiser sa fréquence à zéro.
-7. Augmenter le décompte et la fréquence du nouveau mot de 1.
+La recherche binaire permet de réduire le nombre de comparaisons nécessaires pour retrouver un mot.
 
-Si le dictionnaire est plein et que le mot n'existe pas, le programme affiche un message d'erreur et termine son exécution.
+### 3.6 Insertion — `Insérer`
 
-### Affichage (routine `Imprimer`)
+La routine `Insérer` met à jour la fréquence d'un mot existant ou insère un nouveau mot trié :
 
-La routine parcourt les tiplets et pour chaque triplet, on affiche ca position, ca longueur et sa fréquence. Ensuite, on affiche le mot à l'adresse. Le pointeur du dictionnaire avance de 24 octets pour chaque triplet
+1. Appeler `Rechercher` pour obtenir l'index du mot ou sa position d'insertion.
+2. Si le mot est déjà présent, incrémenter sa fréquence sans modifier le nombre d'entrées.
+3. Sinon, vérifier que le dictionnaire n'a pas atteint sa capacité maximale (200 entrées).
+4. Calculer l'adresse d'insertion (`dictionnaire + index * 24`).
+5. Décaler les entrées suivantes vers la droite pour libérer l'emplacement.
+6. Enregistrer la position et la longueur du nouveau mot, puis initialiser sa fréquence à `1`.
+7. Incrémenter le nombre d'entrées du dictionnaire.
 
-## Compilation et exécution
+Si le dictionnaire est plein et que le mot n'existe pas, le programme affiche un message d'erreur et termine l'exécution.
 
-Placez `mots.s` et le fichier texte à analyser dans votre dossier de
-travail.
+### 3.7 Affichage — `Imprimer`
 
-Avec le fichier JAR de RARS, assemblez en mode RV64 :
+La routine `Imprimer` parcourt chaque entrée du dictionnaire (pas de 24 octets) et affiche la position, la longueur en octets, la fréquence d'apparition ainsi que le mot correspondant.
 
-``` bash
-java -jar rars.jar rv64 mots.s
+## 4. Compilation et exécution
+
+Placez `mots.s` et le fichier texte à analyser dans le répertoire de travail, puis lancez RARS en mode RV64 en passant le fichier en argument :
+
+```bash
+java -jar rars.jar rv64 mots.s pa fichier.txt
 ```
-
-Le programme est prévu pour recevoir le nom du fichier texte comme
-argument. La méthode exacte de passage des arguments dépend du mode de
-lancement et de la configuration de RARS utilisée.
 
 Exemple de fichier d'entrée :
 
-``` text
+```text
 Bonjour le monde.
 Bonjour, monde!
 ```
 
-## Plan de tests pour la reprise
+Le dictionnaire contient alors les mots distincts rencontrés dans le texte, avec leur position, leur longueur et leur fréquence.
 
-Tester progressivement :
+## 5. Tests effectués
 
--   Fichier vide.
--   Un seul mot.
--   Plusieurs mots séparés par espaces, tabulations et fins de ligne.
--   Ponctuation et apostrophes.
--   Chiffres au début, au milieu et à la fin d'une séquence.
--   Mots répétés : la fréquence doit être mise à jour sans créer de
-    doublon.
--   Mots dont l'ordre de tri diffère de l'ordre d'apparition.
--   Mots avec lettres accentuées et majuscules.
--   Fichier de 2048 octets et fichier dépassant cette limite.
--   Dictionnaire contenant 200 mots distincts, puis tentative d'ajout
-    d'un nouveau mot.
+Le programme a été validé sur les jeux de test de référence fournis (`prefixes.txt`, `suffixes.txt`, `diacritiques.txt` selon l'erratum, et `long_texte.txt`), ainsi que sur des scénarios complémentaires :
 
-## Auteurs
+- **Fichiers et encodage :** fichier vide, mot unique, séparateurs variés, ponctuation, exclusion des chiffres, mots répétés, tri alphabétique distinct de l'ordre d'apparition et caractères accentués UTF-8 (l'affichage des accents pouvant dépendre du support UTF-8 de la console).
+- **Capacité mémoire :** fichier atteignant la limite de 2048 octets (par exemple 1024 occurrences d'un mot d'un octet) et fichier dépassant 2048 octets (message d'erreur attendu).
+- **Limite du dictionnaire et erreurs d'E/S :** plus de 200 mots distincts (message d'erreur de dictionnaire plein), absence d'argument ou nombre d'arguments invalide, et fichier inexistant.
 
--   Judes --- travail initial
--   Thierry --- poursuite et intégration du projet
+## 6. Conclusion
 
-------------------------------------------------------------------------
+Ce travail pratique a permis de mettre en œuvre un dictionnaire de mots trié en assembleur RISC-V 64 bits combinant découpage de texte, gestion UTF-8, recherche binaire, insertion avec décalage et gestion des erreurs. Les tests réalisés confirment le bon comportement général du programme sur les cas nominaux et les cas limites.
+
+## 7. Auteurs
+
+- Judes et Thierry
