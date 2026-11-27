@@ -33,7 +33,7 @@ str_arrow:  .string " -> idx="
 str_found:  .string ", found="
 
 .text
-.globl main
+#.globl main
 
 main:
     # 1. Dictionnaire vide (n=0), cible "le" -> idx=0, found=0
@@ -152,11 +152,11 @@ exec_rech:
 # ============================================================
 # Rechercher
 # Entrées :
-#   a0 = adresse du dictionnaire
-#   a1 = nombre d'entrées
-#   a2 = adresse du mot cible
-#   a3 = longueur du mot cible
-#   a4 = adresse de base de input
+#   a0 = &ligne
+#   a1 = début du mot
+#   a2 = longueur du mot
+#   a3 = &dictionnaire
+#   a4 = décompte
 # Sorties :
 #   a0 = index trouvé ou position d'insertion
 #   a1 = 1 si trouvé, 0 sinon
@@ -173,46 +173,51 @@ Rechercher:
     sd   s5, 24(sp)
     sd   s6, 16(sp)
     sd   s7, 8(sp)
+    sd   s8, 0(sp)
 
-    mv   s0, a0          # base dictionnaire
-    mv   s1, a1          # nombre d'entrées
-    mv   s2, a2          # adresse mot cible
-    mv   s3, a3          # longueur cible
-    mv   s4, a4          # base input
+    mv   s0, a3          # adresse dictionnaire
+    mv   s1, a4          # nombre d'entrées
+    add  s2, a0, a1	 # adresse mot cible
+    mv   s3, a2         # longueur mot cible
+    mv   s4, a0          # adresse ligne
 
-    li   s5, 0           # low = 0
-    mv   s6, s1          # high = n
+    li   s5, 0           # i = 0
+    addi s6, s1, -1      # j = compte  -1
 
 rech_boucle:
-    bgeu s5, s6, rech_absent
+    bge s5, s6, rech_absent
 
+    # Calcul de l'index du milieu	
     add  s7, s5, s6
     srli s7, s7, 1       # mid = (low + high) / 2
 
-    # Adresse entrée mid : dict + mid * 24
+    # Adresse entrée mid : dictionnaire + mid * 24
     slli t0, s7, 4
     slli t1, s7, 3
     add  t0, t0, t1
     add  t0, s0, t0
-
-    ld   t2, 0(t0)       # position dans input
-    ld   t3, 8(t0)       # longueur
-    add  t2, s4, t2      # adresse du mot dans input
-
-    mv   a0, t2
-    mv   a1, t3
-    mv   a2, s2
-    mv   a3, s3
+    # Recuperer le mot dans le dictionnaire
+    ld   t2, 0(t0)       # position du mot
+    ld   s8, 8(t0)       # longueur du mot
+    add  t2, s4, t2      # adresse du mot
+    
+    # Determiner la longueur minimale
+    mv a2, s3
+    bleu s3, s8, rech_comparer
+    mv a2, s8
+    
+rech_comparer:
+    mv   a0, s2          # adresse du mot cible
+    mv   a1, t3          # adresse mot dictionnaire
     jal  ra, Comparer
-
-    beq  a0, zero, rech_trouve
-    blt  a0, zero, rech_droite
-
-    mv   s6, s7          # high = mid
+    # comparer les longueurs des préfixes identique
+    bltz  a0, rech_trouve
+    bgtz  a0, rech_droite
     j    rech_boucle
-
+rech_gauche:
+    addi s6, s7, -1      # j = m - 1
 rech_droite:
-    addi s5, s7, 1       # low = mid + 1
+    addi s5, s7, 1       # i = m + 1
     j    rech_boucle
 
 rech_trouve:
@@ -221,7 +226,7 @@ rech_trouve:
     j    rech_fin
 
 rech_absent:
-    mv   a0, s5
+    mv   a0, s5		
     li   a1, 0
 
 rech_fin:

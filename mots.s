@@ -2,31 +2,8 @@
 # TP2 - Dictionnaire de mots
 # INF2171 - Automne 2026
 # RISC-V 64 bits
-# Auteur : JUDES
+# Auteur : JUDES Et Thierry
 # ============================================================
-# ETAT DU TRAVAIL - VERSION DE PASSATION
-# ------------------------------------------------------------
-# Modules présents :
-#   - lecture du fichier et contrôle de taille (2048 octets)
-#   - Delimiteur
-#   - Séparer
-#   - Map
-#   - Comparer
-#
-# A TERMINER AVANT DE CONSIDERER LE TP COMME FINAL :
-#   1. Remplacer le bouchon de test Insérer par la vraie insertion
-#      ordonnée (avec détection de capacité et fréquence des doublons).
-#   2. Intégrer Rechercher (recherche binaire) avec le prototype
-#      officiel de l'énoncé.
-#   3. Ajouter l'affichage final du dictionnaire trié.
-#   4. Tester l'ensemble avec les fichiers fournis et des cas limites.
-#
-# IMPORTANT : la routine Insérer ci-dessous affiche encore les mots
-# découpés. Elle ne construit PAS encore le dictionnaire.
-# Cette version est un point de reprise pour le binôme, pas une
-# version finale prête à remettre.
-# ============================================================
-
 
 # ============================================================
 # SECTION 1 - CONSTANTES
@@ -61,7 +38,6 @@
 input:
     .space 2049
 
-
 # ------------------------------------------------------------
 # 2.2 Dictionnaire
 # ------------------------------------------------------------
@@ -74,6 +50,7 @@ input:
 # Une entrée = 24 octets
 # 200 entrées = 4800 octets
 
+.align 3
 dictionnaire:
     .space 4800
 
@@ -107,6 +84,8 @@ str_sep_len:
 str_sep_mot:
     .string " mot="
 
+str_err_dict:
+    .string "Erreur :  dictionnaire plein\n"
 
 # ============================================================
 # SECTION 3 - SEGMENT TEXT
@@ -226,7 +205,12 @@ main:
     la   a1, dictionnaire
     la   a2, compte
     jal  ra, Séparer
-
+    
+    la   a0, input
+    la   a1, dictionnaire
+    la   t0, compte
+    ld   a2, 0(t0)
+    jal  ra, Imprimer
 
     # --------------------------------------------------------
     # 4.8 Fin normale
@@ -492,62 +476,6 @@ separer_fin:
 
 
 # ------------------------------------------------------------
-# 7.4 BOUCHON TEMPORAIRE : Insérer (à remplacer par la vraie insertion)
-# ------------------------------------------------------------
-# Affiche simplement pos, len et le mot extrait pour valider
-# le découpage de Séparer avant d'implémenter le vrai dictionnaire.
-# Entrées :
-#   a0 = &ligne
-#   a1 = début
-#   a2 = longueur
-#   a3 = &dictionnaire
-#   a4 = &compte
-# ------------------------------------------------------------
-
-Insérer:
-    mv   t0, a0           # t0 = &ligne
-    mv   t1, a1           # t1 = début
-    mv   t2, a2           # t2 = longueur
-
-    la   a0, str_sep_pos
-    li   a7, prstr
-    ecall
-
-    mv   a0, t1
-    li   a7, print_int
-    ecall
-
-    la   a0, str_sep_len
-    li   a7, prstr
-    ecall
-
-    mv   a0, t2
-    li   a7, print_int
-    ecall
-
-    la   a0, str_sep_mot
-    li   a7, prstr
-    ecall
-
-    li   t3, 0            # compteur d'octets affichés
-inserer_stub_boucle:
-    bge  t3, t2, inserer_stub_fin
-    add  t4, t0, t1
-    add  t4, t4, t3
-    lbu  a0, 0(t4)
-    li   a7, print_char
-    ecall
-    addi t3, t3, 1
-    j    inserer_stub_boucle
-
-inserer_stub_fin:
-    li   a0, 10           # '\n'
-    li   a7, print_char
-    ecall
-    ret
-
-
-# ------------------------------------------------------------
 # 7.5 MACRO : MAPPAGE D'UN OCTET DIACRITIQUE UTF-8
 # ------------------------------------------------------------
 # Si a0 == %oct_utf8, remplace a0 par %base et retourne.
@@ -596,46 +524,38 @@ Map:
     MAP_DIACRITIQUE 0xBC, 'u'   # ü
 
     # Majuscules accentuées courantes (après 0xC3)
-    MAP_DIACRITIQUE 0x80, 'a'   # À
-    MAP_DIACRITIQUE 0x82, 'a'   # Â
-    MAP_DIACRITIQUE 0x84, 'a'   # Ä
-    MAP_DIACRITIQUE 0x87, 'c'   # Ç
-    MAP_DIACRITIQUE 0x88, 'e'   # È
-    MAP_DIACRITIQUE 0x89, 'e'   # É
-    MAP_DIACRITIQUE 0x8A, 'e'   # Ê
-    MAP_DIACRITIQUE 0x8B, 'e'   # Ë
-    MAP_DIACRITIQUE 0x8E, 'i'   # Î
-    MAP_DIACRITIQUE 0x8F, 'i'   # Ï
-    MAP_DIACRITIQUE 0x94, 'o'   # Ô
-    MAP_DIACRITIQUE 0x96, 'o'   # Ö
-    MAP_DIACRITIQUE 0x99, 'u'   # Ù
-    MAP_DIACRITIQUE 0x9B, 'u'   # Û
-    MAP_DIACRITIQUE 0x9C, 'u'   # Ü
-
-    # Majuscules ASCII 'A'..'Z' -> minuscules 'a'..'z'
-    li   t0, 0x41
-    bltu a0, t0, map_fin
-    li   t0, 0x5A
-    bgtu a0, t0, map_fin
-    addi a0, a0, 32
+    MAP_DIACRITIQUE 0x80, 'A'   # À
+    MAP_DIACRITIQUE 0x82, 'A'   # Â
+    MAP_DIACRITIQUE 0x84, 'A'   # Ä
+    MAP_DIACRITIQUE 0x87, 'C'   # Ç
+    MAP_DIACRITIQUE 0x88, 'E'   # È
+    MAP_DIACRITIQUE 0x89, 'E'   # É
+    MAP_DIACRITIQUE 0x8A, 'E'   # Ê
+    MAP_DIACRITIQUE 0x8B, 'E'   # Ë
+    MAP_DIACRITIQUE 0x8E, 'I'   # Î
+    MAP_DIACRITIQUE 0x8F, 'I'   # Ï
+    MAP_DIACRITIQUE 0x94, 'O'   # Ô
+    MAP_DIACRITIQUE 0x96, 'O'   # Ö
+    MAP_DIACRITIQUE 0x99, 'U'   # Ù
+    MAP_DIACRITIQUE 0x9B, 'U'   # Û
+    MAP_DIACRITIQUE 0x9C, 'U'   # Ü
 
 map_fin:
     ret
     
     
- # ------------------------------------------------------------
+# ------------------------------------------------------------
 # 7.7 ROUTINE : Comparer
 # ------------------------------------------------------------
 # Entrées (ABI RV64) :
 #   a0 = adresse du premier mot (&a)
-#   a1 = longueur du premier mot (en octets)
-#   a2 = adresse du second mot (&b)
-#   a3 = longueur du second mot (en octets)
+#   a1 = adresse du second mot (&b)
+#   a2 = longueur du premier mot (en octets)
 #
 # Sortie :
-#   a0 < 0 si premier mot < second mot
+#   a0 < 0 si premier mot a < second mot b
 #   a0 = 0 si les deux mots sont identiques
-#   a0 > 0 si premier mot > second mot
+#   a0 > 0 si premier mot a > second mot b
 #
 # Règles :
 #   1. Lecture par caractère en respectant les frontières UTF-8
@@ -651,135 +571,384 @@ map_fin:
 # ------------------------------------------------------------
 
 Comparer:
-    addi sp, sp, -96
-    sd   ra, 88(sp)
-    sd   s0, 80(sp)       # s0 = &a
-    sd   s1, 72(sp)       # s1 = len_a
-    sd   s2, 64(sp)       # s2 = &b
-    sd   s3, 56(sp)       # s3 = len_b
-    sd   s4, 48(sp)       # s4 = index courant dans a (i)
-    sd   s5, 40(sp)       # s5 = index courant dans b (j)
-    sd   s6, 32(sp)       # s6 = valeur mappée courante de a
-    sd   s7, 24(sp)       # s7 = 1er octet brut de a
-    sd   s8, 16(sp)       # s8 = 2e octet brut de a (si 2 octets, sinon 0)
-    sd   s9, 8(sp)        # s9 = pas d'avancement de a (1 ou 2)
+    addi sp, sp, -64
+    sd   ra, 56(sp)
+    sd   s0, 48(sp)
+    sd   s1, 40(sp)     
+    sd   s2, 32(sp)   
+    sd   s3, 24(sp)      
+    sd   s4, 16(sp)    
+    sd   s5, 8(sp)       
 
-    mv   s0, a0
-    mv   s1, a1
-    mv   s2, a2
-    mv   s3, a3
-    li   s4, 0
-    li   s5, 0
+    mv   s0, a0		# adresse premier mot a
+    mv   s1, a1		# adresse du second mot b
+    mv   s2, a2		# Longueur a comparer
+    li   s3, 0		# index
 
 comp_boucle:
-    bgeu s4, s1, comp_fin_commun
-    bgeu s5, s3, comp_fin_commun
+    bgeu s3, s2, comp_identique
+    
+    # Lecture octects
+    add t0, s0, s3
+    lbu s4, 0(t0)
+    add t0, s1, s3
+    lbu s5, 0(t0)
+    
+    # Octets identique = continuer
+    beq s4, s5, comp_avancer
+    
+    # Verifier accent premier mot a
+    li t0, 0xC3
+    beq s4, t0, comp_accent_a
+    
+    # Verifier accent premier mot b
+    beq s5, t0, comp_accent_b
+    
+    # Comparer octet brut
+    sub a0, s4, s5
+    j comp_fin
+    
+comp_avancer:
+    # avancer Index
+    addi s3, s3, 1
+    j comp_boucle
 
-    # --- Lire le caractère courant de a (à s4, borne s1) ---
-    add  t0, s0, s4
-    lbu  s7, 0(t0)        # 1er octet brut de a
-    li   s8, 0            # 2e octet brut de a par défaut = 0
-    li   s9, 1            # pas par défaut = 1 octet
+comp_accent_a:
+    # Recupere deuxieme octet UTF8
+    add t0, s0, s3
+    lbu a0,1(t0)
+    jal ra, Map
+    # comparer le caractere avec celui de b
+    beq a0, s5, comp_positif
+    sub a0, a0, s5
+    j comp_fin
 
-    li   t0, 0xC3
-    bne  s7, t0, comp_a_ascii
-    addi t1, s4, 1
-    bgeu t1, s1, comp_a_ascii   # 2e octet hors limite de a -> octet isolé
-    add  t0, s0, t1
-    lbu  s8, 0(t0)        # 2e octet brut de a
-    mv   a0, s8
-    jal  ra, Map
-    mv   s6, a0           # s6 = valeur mappée de a
-    li   s9, 2
-    j    comp_b
+comp_accent_b:
+    # Recupere deuxieme octet UTF8
+    add t0, s1, s3
+    lbu a0, 1(t0)
+    jal ra, Map
+    # comparer le caractere avec celui de b
+    beq a0, s4, comp_negatif
+    sub a0, s4, a0
+    j comp_fin
 
-comp_a_ascii:
-    mv   a0, s7
-    jal  ra, Map
-    mv   s6, a0           # s6 = valeur mappée de a
+comp_positif:
+    li a0, 1
+    j comp_fin
 
-    # --- Lire le caractère courant de b (à s5, borne s3) ---
-    # On garde :
-    #   t2 = 1er octet brut de b
-    #   t3 = 2e octet brut de b (0 si 1 octet)
-    #   t4 = pas de b (1 ou 2)
-    #   a0 = valeur mappée de b
-comp_b:
-    add  t0, s2, s5
-    lbu  t2, 0(t0)        # 1er octet brut de b
-    li   t3, 0            # 2e octet brut de b par défaut = 0
-    li   t4, 1            # pas de b par défaut = 1 octet
+comp_negatif:
+    li a0, -1
+    j comp_fin
 
-    li   t0, 0xC3
-    bne  t2, t0, comp_b_ascii
-    addi t1, s5, 1
-    bgeu t1, s3, comp_b_ascii   # 2e octet hors limite de b -> octet isolé
-    add  t0, s2, t1
-    lbu  t3, 0(t0)        # 2e octet brut de b
-
-    # Sauvegarder t2, t3, t4 avant jal ra, Map (t0-t6 peuvent être écrasés)
-    addi sp, sp, -16
-    sd   t2, 8(sp)
-    sd   t3, 0(sp)
-    mv   a0, t3
-    jal  ra, Map
-    ld   t2, 8(sp)
-    ld   t3, 0(sp)
-    addi sp, sp, 16
-    li   t4, 2
-    j    comp_comparer_car
-
-comp_b_ascii:
-    addi sp, sp, -16
-    sd   t2, 8(sp)
-    sd   t3, 0(sp)
-    mv   a0, t2
-    jal  ra, Map
-    ld   t2, 8(sp)
-    ld   t3, 0(sp)
-    addi sp, sp, 16
-    li   t4, 1
-
-    # --- Règle 2 : comparer les valeurs mappées (s6 vs a0) ---
-comp_comparer_car:
-    bne  s6, a0, comp_diff_map
-
-    # --- Règle 3 : départage par octets bruts ---
-    bne  s7, t2, comp_diff_brut1
-    bne  s8, t3, comp_diff_brut2
-
-    # Caractères identiques : avancer les deux index
-    add  s4, s4, s9
-    add  s5, s5, t4
-    j    comp_boucle
-
-comp_diff_map:
-    sub  a0, s6, a0
-    j    comp_fin
-
-comp_diff_brut1:
-    sub  a0, s7, t2
-    j    comp_fin
-
-comp_diff_brut2:
-    sub  a0, s8, t3
-    j    comp_fin
-
-    # --- Règle 4 : départage par longueur en octets ---
-comp_fin_commun:
-    sub  a0, s1, s3
+comp_identique:
+    li a0, 0 
 
 comp_fin:
-    ld   ra, 88(sp)
-    ld   s0, 80(sp)
-    ld   s1, 72(sp)
-    ld   s2, 64(sp)
-    ld   s3, 56(sp)
-    ld   s4, 48(sp)
-    ld   s5, 40(sp)
-    ld   s6, 32(sp)
-    ld   s7, 24(sp)
-    ld   s8, 16(sp)
-    ld   s9, 8(sp)
-    addi sp, sp, 96
+    ld   ra, 56(sp)
+    ld   s0, 48(sp)
+    ld   s1, 40(sp)     
+    ld   s2, 32(sp)   
+    ld   s3, 24(sp)      
+    ld   s4, 16(sp)    
+    ld   s5, 8(sp) 
+    addi sp, sp, 64
     ret
+# ============================================================
+# 7.8 ROUTINE : Recherche
+# ============================================================
+# Entrées :
+#   a0 = &ligne
+#   a1 = début du mot
+#   a2 = longueur du mot
+#   a3 = &dictionnaire
+#   a4 = décompte
+# Sorties :
+#   a0 = index trouvé ou position d'insertion
+#   a1 = 1 si trouvé, 0 sinon
+# ============================================================
+Rechercher:
+    addi sp, sp, -80
+
+    sd   ra, 72(sp)
+    sd   s0, 64(sp)
+    sd   s1, 56(sp)
+    sd   s2, 48(sp)
+    sd   s3, 40(sp)
+    sd   s4, 32(sp)
+    sd   s5, 24(sp)
+    sd   s6, 16(sp)
+    sd   s7, 8(sp)
+    sd   s8, 0(sp)
+
+    mv   s0, a3          # adresse dictionnaire
+    mv   s1, a4          # nombre d'entrées
+    add  s2, a0, a1	 # adresse mot cible
+    mv   s3, a2         # longueur mot cible
+    mv   s4, a0          # adresse ligne
+
+    li   s5, 0           # i = 0
+    addi s6, s1, -1      # j = compte  -1
+
+rech_boucle:
+    bgt s5, s6, rech_absent
+
+    # Calcul de l'index du milieu	
+    add  s7, s5, s6
+    srli s7, s7, 1       # mid = (low + high) / 2
+
+    # Adresse entrée mid : dictionnaire + mid * 24
+    slli t0, s7, 4
+    slli t1, s7, 3
+    add t0, t0, t1
+    add t0, s0, t0
+    # Recuperer le mot dans le dictionnaire
+    ld  t2, 0(t0)       # position du mot
+    ld  s8, 8(t0)       # longueur du mot
+    add t2, s4, t2      # adresse du mot
+    
+    # Determiner la longueur minimale
+    mv a2, s3
+    bleu s3, s8, rech_comparer
+    mv a2, s8
+rech_comparer:
+    mv   a0, s2
+    mv   a1, t2
+    jal  ra, Comparer
+
+    bltz a0, rech_gauche
+    bgtz a0, rech_droite
+
+    # Comparer les longueurs
+    beq  s3, s8, rech_trouve
+    bltu s3, s8, rech_gauche
+    j    rech_droite
+
+rech_gauche:
+    addi s6, s7, -1
+    j    rech_boucle
+
+rech_droite:
+    addi s5, s7, 1
+    j    rech_boucle
+
+rech_trouve:
+    mv   a0, s7
+    li   a1, 1
+    j    rech_fin
+
+rech_absent:
+    mv   a0, s5		
+    li   a1, 0
+
+rech_fin:
+    ld ra, 72(sp)
+    ld s0, 64(sp)
+    ld s1, 56(sp)
+    ld s2, 48(sp)
+    ld s3, 40(sp)
+    ld s4, 32(sp)
+    ld s5, 24(sp)
+    ld s6, 16(sp)
+    ld s7, 8(sp)
+    ld s8, 0(sp)
+
+    addi sp, sp, 80
+    ret
+
+# ------------------------------------------------------------
+# 7.9 ROUTINE : Inserer
+# ------------------------------------------------------------
+#	Entrées (ABI RV64) :
+#	a1: debut mot
+#	a2: longueur mot
+#	a3: adresse dictionnaire
+#	a4: adresse decompte
+#-------------------------------------------------------------
+Insérer:
+    addi sp, sp, -64
+    sd   ra, 56(sp)
+    sd   s0, 48(sp)
+    sd   s1, 40(sp)     
+    sd   s2, 32(sp)   
+    sd   s3, 24(sp)      
+    sd   s4, 16(sp)    
+    sd   s5, 8(sp)  
+    
+    # Sauvegarder les informations
+    mv s0, a1	 # valeur debut mot
+    mv s1, a2    # valeur longueur mot
+    mv s2, a3    # adresse dictionnaire
+    mv s3, a4    # adresse decompte
+    ld s4, 0(s3) # valeur decompte
+    
+    # Rechercher mot dans le dictionnaire
+    mv a4,s4
+    jal ra, Rechercher
+    mv s5, a0 # index trouver dans recherche
+    
+    # calcul de l'adresse : index * 24
+    slli t0, s5, 4
+    slli t1, s5, 3
+    add t0, t0, t1
+    add t0, s2, t0
+    
+    # verifier si le mot exister pour augmenter sa frequence 
+    bnez a1, inserer_frequence
+    
+    # verifier capacite  du dictionnaire
+    li t1 MAXMOTS
+    bgeu s4, t1, inserer_plein
+    
+    # adresse case libre
+    slli t1, s4, 4
+    slli t2, s4, 3
+    add t1, t1, t2
+    add t1, s2, t1
+   
+inserer_decaler:
+    # arret lorsqu'on atteint une adresse d'insertion
+    beq t1, t0, inserer_nouveau
+    
+    # adresse du precedent
+    addi t2, t1, -24
+     
+     # copier des valeurs
+     ld t3, 0(t2)
+     ld t4, 8(t2)
+     ld t5, 16(t2)
+     sd t3, 0(t1)
+     sd t4, 8(t1)
+     sd t5, 16(t1)
+     
+     # reculer d'un triplet
+     addi t1, t1, -24
+     j inserer_decaler
+inserer_nouveau:
+     # Enregistrer position et longueur
+     sd s0, 0(t0)
+     sd s1, 8(t0)
+     
+     # Mettre la frequence a zero     
+     sd zero, 16(t0)
+      
+     # Augmenter le nombre de mots differents
+     addi s4, s4, 1
+     sd s4, 0(s3)
+inserer_frequence:
+     # Augmenter frequence du mot
+     ld t1, 16(t0)
+     addi t1, t1, 1
+     sd t1, 16(t0)
+     j inserer_fin
+inserer_plein:
+     la a0 ,str_err_dict
+     j ecrire_erreur
+inserer_fin:
+     ld ra, 56(sp)
+     ld s0, 48(sp)
+     ld s1, 40(sp)
+     ld s2, 32(sp)
+     ld s3, 24(sp)
+     ld s4, 16(sp)
+     ld s5, 8(sp)
+      
+     addi sp,sp,64
+     ret
+# ------------------------------------------------------------
+# 7.10 ROUTINE : Imprimer
+# ------------------------------------------------------------
+#	Entrées (ABI RV64) :
+#       a0: adresse texte
+#	a1: adresse dictionnaire
+#	a2: nombre de mots differents
+#-------------------------------------------------------------
+Imprimer:
+    addi sp, sp, -48
+    sd   s0, 40(sp)
+    sd   s1, 32(sp)
+    sd   s2, 24(sp)
+    sd   s3, 16(sp)
+    sd   s4, 8(sp)
+    sd   s5, 0(sp)
+
+    mv   s0, a0          # Adresse du texte
+    mv   s1, a1          # Adresse du dictionnaire
+    mv   s2, a2          # Nombre de mots distincts
+
+imprimer_boucle:
+    beqz s2, imprimer_fin
+
+    # Récupérer la position et la longueur
+    ld   s3, 0(s1)
+    ld   s4, 8(s1)
+
+    # Afficher la position
+    mv   a0, s3
+    li   a7, print_int
+    ecall
+
+    # Afficher un espace
+    li   a0, 32
+    li   a7, print_char
+    ecall
+
+    # Afficher la longueur
+    mv   a0, s4
+    li   a7, print_int
+    ecall
+
+    # Afficher un espace
+    li   a0, 32
+    li   a7, print_char
+    ecall
+
+    # Afficher la fréquence
+    ld   a0, 16(s1)
+    li   a7, print_int
+    ecall
+
+    # Afficher un espace
+    li   a0, 32
+    li   a7, print_char
+    ecall
+
+    # Calculer l'adresse du mot
+    add  s5, s0, s3
+
+imprimer_mot:
+    beqz s4, imprimer_suivant
+
+    # Afficher un octet du mot
+    lbu  a0, 0(s5)
+    li   a7, print_char
+    ecall
+
+    # Avancer dans le mot
+    addi s5, s5, 1
+    addi s4, s4, -1
+    j    imprimer_mot
+
+imprimer_suivant:
+    # Retour à la ligne
+    li   a0, 10
+    li   a7, print_char
+    ecall
+
+    # Passer au prochain triplet
+    addi s1, s1, 24
+    addi s2, s2, -1
+    j    imprimer_boucle
+
+imprimer_fin:
+    ld   s0, 40(sp)
+    ld   s1, 32(sp)
+    ld   s2, 24(sp)
+    ld   s3, 16(sp)
+    ld   s4, 8(sp)
+    ld   s5, 0(sp)
+
+    addi sp, sp, 48
+    ret
+
+    
