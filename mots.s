@@ -3,7 +3,7 @@
 # INF2171 - Automne 2026
 # RISC-V 64 bits
 # Auteur : LABE Judes Et Thierry
-# Code permanent : LABM64310600
+# Code permanent : LABM64310600 et BECT90050208
 # ============================================================
 
 # ============================================================
