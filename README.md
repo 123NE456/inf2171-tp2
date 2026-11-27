@@ -6,11 +6,6 @@ Le programme est écrit en **assembleur RISC-V 64 bits**. Il vise à lire
 un fichier texte, en extraire les mots et construire un dictionnaire de
 mots distincts avec leur position, leur longueur et leur fréquence.
 
-> **État du dépôt : point de reprise en cours de développement.**\
-> Le code contient plusieurs routines déjà présentes, mais l'intégration
-> complète du dictionnaire n'est pas terminée. Consultez la section
-> [État du projet](#état-du-projet).
-
 ## Objectif
 
 À partir d'un fichier texte fourni en argument, le programme doit :
@@ -35,42 +30,6 @@ de recherche et d'insertion.
 -   **Capacité prévue du tampon :** 2048 octets
 -   **Nombre maximal prévu d'entrées distinctes :** 200
 
-## Organisation du code
-
-Le fichier `mots.s` est organisé en sections commentées :
-
-  -----------------------------------------------------------------------
-  Section                             Contenu
-  ----------------------------------- -----------------------------------
-  Constantes                          Limites du tampon et du
-                                      dictionnaire, codes des appels
-                                      système
-
-  Segment `.data`                     Tampon de lecture, espace du
-                                      dictionnaire, compteur et messages
-
-  `main`                              Vérification des arguments,
-                                      ouverture, lecture et fermeture du
-                                      fichier
-
-  Gestion des erreurs                 Messages pour les arguments,
-                                      l'ouverture, la lecture et la
-                                      taille du fichier
-
-  `Delimiteur`                        Détection des espaces, caractères
-                                      de contrôle et ponctuation
-
-  `Séparer`                           Parcours du tampon, repérage des
-                                      mots et appel à `Insérer`
-
-  `Map`                               Mappage de certains caractères
-                                      accentués UTF-8 et conversion ASCII
-                                      majuscule/minuscule
-
-  `Comparer`                          Comparaison de mots selon les
-                                      règles implémentées dans la routine
-  -----------------------------------------------------------------------
-
 ### Structure prévue d'une entrée du dictionnaire
 
 Chaque entrée occupe **24 octets** :
@@ -82,6 +41,64 @@ Chaque entrée occupe **24 octets** :
   Fréquence                     8 octets
 
 L'espace réservé à 200 entrées est donc de 4800 octets.
+
+## Algorithme général
+
+### Gestion des délimiteurs (routine `Delimiteur`)
+
+Cette routine fait la détection d'un octet reçu pour savoir s'il s'agit d'un délimiteur.
+La macro `TEST_DELIM` permet de tester les caractères sans refaire les mêmes instructions.
+
+### Séparation  des mots (routine `Separer`)
+
+La routine parcourt octet par octet jusqu'a trouver le début d'un mot, mémorise sa position et avance au prochaine delimiteur. On calcule la longueur du mot en soustrayant la position du début à la position du caractère avant le délimiteur. On appelle la routine `Inserer` pour l'insertion du mot et on continue le parcours du texte jusqu'a la fin.
+
+### Gestion des caractères UTF8
+
+Tous les caractères ASCII font un octet, mais les caracteres avec accent ont deux octect et le premier octet est `0xC3`
+La routine `Map` utilise la macro `MAP_DIACRITIQUE` pour l'association du deuxième caractere à la lettre correspondant en ASCII minuscule et majuscule.
+
+### Comparer les mots (routine `Comparer`)
+
+La routine `comparer` recoit les adresses des deux mots a comparer et la longueur de comparaison. On retourne une valeur négatif si le premier mot et avant le second, zero si les valeur sont pareil et positif si le premier mot et apres le second
+
+1.  Si les octets sont identiques, l'index avance.
+2.  Si le premier octet différent du premier mot est égal à `0xC3`, son deuxième octet est converti avec `Map`. La routine retourne la différence avec l'octet du deuxième mot, ou `1` si les valeurs correspondent.
+3.  Si c'est l'octet du deuxième mot est égal à `0xC3`, la routine retourne la différence avec l'octet du premier mot. La routine retourne la différence, ou `-1` si les valeurs correspondent.
+4.  Sinon, la routine retourne la différence entre les deux octets.
+5.  Si toute la longueur est parcourue sans différence, elle retourne zéro.
+
+### Fouille binaire (routine `Rechercher`)
+
+La recherche permet de trouver un mot sans avoir a faire tous les entrées du dictionnaires
+On recoit l'adresse du tampon, la position et la longueur du mot, l'adresse du dictionnaire et la valeur du décompte.
+
+1.  Initialiser `i = 0` et `j = compte - 1`.
+2.  Tant que `i <= j`, calculer le milieu `m = (i + j) / 2`.
+3.  Calculer l'adresse de l'entrée : `dictionnaire + m * 24`.
+4.  Lire la position et la longueur du mot de cette entrée, puis calculer son adresse dans le tampon.
+5.  Appeler la routine `Comparer` avec la plus petite des deux longueurs.
+6.  Si le résultat est négatif, on poursuit à gauche (`j = m - 1`). S'il est positif, poursuivre à droite (`i = m + 1`).
+7.  Si le résultat est nul, on compare les longueurs  si elles sont égales alors le mot est trouvé.
+8.  Si l'intervalle devient vide, on retourne `i` comme position d'insertion.
+
+ ### Insertion (routine `Insérer`)
+
+La routine reçoit les informations du mot, l'adresse du tampon, l'adresse du dictionnaire et l'adresse du décompte.
+
+1. Appeler la routine `Rechercher` pour obtenir l'index du mot ou sa position d'insertion.
+2. Si le mot existe déjà, augmenter sa fréquence sans modifier le décompte.
+3. Si le mot n'existe pas, vérifier que le dictionnaire n'est pas plein.
+4. Calculer l'adresse d'insertion en multipliant l'index par 24 et en ajoutant l'adresse du dictionnaire.
+5. Décaler les triplets vers la droite en partant de la dernière entrée jusqu'à la position d'insertion pour éviter d'écraser les données.
+6. Enregistrer la position et la longueur du nouveau mot et initialiser sa fréquence à zéro.
+7. Augmenter le décompte et la fréquence du nouveau mot de 1.
+
+Si le dictionnaire est plein et que le mot n'existe pas, le programme affiche un message d'erreur et termine son exécution.
+
+### Affichage (routine `Imprimer`)
+
+La routine parcourt les tiplets et pour chaque triplet, on affiche ca position, ca longueur et sa fréquence. Ensuite, on affiche le mot à l'adresse. Le pointeur du dictionnaire avance de 24 octets pour chaque triplet
 
 ## Compilation et exécution
 
@@ -105,38 +122,6 @@ Bonjour le monde.
 Bonjour, monde!
 ```
 
-## État du projet
-
-### Implémenté ou présent dans le fichier
-
--   Lecture du fichier dans un tampon et ajout du caractère nul de fin.
--   Vérification de la taille maximale prévue du fichier.
--   Gestion de plusieurs erreurs d'ouverture et de lecture.
--   Routine `Delimiteur`.
--   Routine `Séparer` pour repérer les mots et exclure les chiffres
-    ASCII.
--   Routine `Map` pour certains caractères UTF-8 accentués et les
-    majuscules ASCII.
--   Routine `Comparer` avec comparaison des caractères mappés et
-    départage selon les octets bruts.
-
-### À poursuivre
-
--   Remplacer le bouchon temporaire de `Insérer` par l'insertion réelle
-    dans le dictionnaire.
--   Intégrer `Rechercher` conformément au prototype de l'énoncé.
--   Maintenir l'ordre trié et mettre à jour la fréquence des mots
-    répétés.
--   Finaliser l'affichage du dictionnaire.
--   Vérifier les signatures des routines et les conventions d'appel dans
-    tout le programme.
--   Exécuter les tests d'intégration et les cas limites, notamment la
-    capacité maximale.
-
-**Important :** une routine présente dans le fichier n'est pas
-nécessairement intégrée ou validée dans le programme complet. Vérifiez
-ses paramètres et ses registres avant de poursuivre.
-
 ## Plan de tests pour la reprise
 
 Tester progressivement :
@@ -154,26 +139,9 @@ Tester progressivement :
 -   Dictionnaire contenant 200 mots distincts, puis tentative d'ajout
     d'un nouveau mot.
 
-## Collaboration
-
-Ce dépôt sert de **point de reprise** pour continuer le TP en
-collaboration.
-
-Avant de modifier le code :
-
-1.  Lire les commentaires et les prototypes des routines.
-2.  Vérifier l'énoncé officiel du TP.
-3.  Identifier les routines déjà testées et celles qui restent à
-    intégrer.
-4.  Effectuer les modifications dans une branche dédiée.
-5.  Tester chaque routine, puis le programme complet avant de fusionner.
-
 ## Auteurs
 
 -   Judes --- travail initial
--   Collaborateur --- poursuite et intégration du projet
+-   Thierry --- poursuite et intégration du projet
 
 ------------------------------------------------------------------------
-
-*Ce README décrit l'état actuel du point de reprise. Il doit être
-actualisé au fur et à mesure de l'avancement.*
